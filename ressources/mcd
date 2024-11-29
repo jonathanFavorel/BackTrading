@@ -1,0 +1,118 @@
+Table User {
+  _id ObjectId [pk]
+  nametag String [unique]
+  firstName String
+  lastName String
+  email String [unique]
+  phoneNumber String
+  profilePicture String
+  password String
+  dateOfBirth Date
+  bio String
+  createdAt Date
+  lastLogin Date
+  onlineStatus Boolean
+  isAdmin Boolean
+  privacySettings JSON
+}
+
+Table TradingAccount {
+  _id ObjectId [pk]
+  user_id ObjectId [ref: > User._id]
+  currency String
+  leverage Number
+  isPropFirm Boolean
+  propFirm_id ObjectId [ref: > PropFirm._id]
+  amount Number
+  date Date
+}
+
+Table PropFirm {
+  _id ObjectId [pk]
+  name String [unique]
+  logoUrl String
+}
+
+Table Currency {
+  _id ObjectId [pk]
+  name String [unique]
+  symbol String [unique]
+  contractSize Number
+  type String [note: 'commodities, crypto, indice, forex, action']
+}
+
+Table Trade {
+  _id ObjectId [pk]
+  tradingAccounts ObjectId[] [ref: > TradingAccount._id]
+  currency_id ObjectId [ref: > Currency._id]
+  entryPrice Number
+  exitPrice Number
+  takeProfit Number
+  quantity Number
+  status String [note: 'en cours, StopLoss, BreakEven, TakeProfit']
+  entryDate datetime
+  exitDate datetime
+}
+
+Table Friend {
+  _id ObjectId [pk]
+  user_id ObjectId [ref: > User._id]
+  friend_id ObjectId [ref: > User._id]
+  status String [note: 'pending, accepted']
+  createdAt Date
+  acceptedAt Date
+}
+
+Table Enemy {
+  _id ObjectId [pk]
+  user_id ObjectId [ref: > User._id]
+  enemy_id ObjectId [ref: > User._id]
+  createdAt Date
+  blockedAt Date
+}
+
+Table Message {
+  _id ObjectId [pk]
+  sender_id ObjectId [ref: > User._id]
+  receiver_id ObjectId [ref: > User._id]
+  content String
+  contentType String [note: 'text, photo, video, link, file']
+  attachmentUrl String
+  status String [note: 'sent, not sent, delivered, read']
+  seen Boolean
+  seenAt datetime
+  createdAt datetime
+  sentAt datetime
+}
+
+Table TradingAccountStats {
+  _id ObjectId [pk]
+  tradingAccount ObjectId [ref: > TradingAccount._id]
+  totalTrades Number
+  winningTrades Number
+  losingTrades Number
+  breakEvenTrades Number
+  totalProfit Number
+  totalLoss Number
+  netProfit Number
+  winRate Number
+  averageWin Number
+  averageLoss Number
+  profitFactor Number
+  averageTrade Number
+  rank Number
+  mostTradedPairs JSON
+  mostProfitablePairs JSON
+  leastProfitablePairs JSON
+}
+
+Table TradeStats {
+  _id ObjectId [pk]
+  trade ObjectId [ref: > Trade._id]
+  symbol String
+  totalTrades Number
+  totalVolume Number
+  totalProfit Number
+  totalLoss Number
+  winRate Number
+}
