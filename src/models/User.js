@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const UserSchema = new mongoose.Schema({
   nametag: { type: String, required: true, unique: true },
@@ -21,4 +21,7 @@ const UserSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('User', UserSchema);
+// Utilisation de createIndexes (recommandé)
+UserSchema.index({ username: 1, email: 1 });
+
+module.exports = mongoose.model("User", UserSchema);
