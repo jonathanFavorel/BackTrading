@@ -1,38 +1,66 @@
-const Trade = require('../models/Trade');
+const Trade = require("../models/Trade");
 
 exports.createTrade = async (req, res) => {
-  const { tradingAccounts, currency, entryPrice, exitPrice, takeProfit, quantity, status, entryDate, exitDate } = req.body;
+  const {
+    tradingAccount,
+    currencyPair,
+    entryPrice,
+    exitPrice,
+    takeProfit,
+    stopLoss,
+    quantity,
+    status,
+    entryDate,
+    exitDate,
+    tradeType,
+  } = req.body;
+
   try {
     // Vérification des champs requis
-    if (!tradingAccounts || !currency || !entryPrice || !quantity || !status || !entryDate) {
-      return res.status(400).json({ msg: 'Please enter all required fields' });
+    const missingFields = [];
+    if (!tradingAccount) missingFields.push("tradingAccount");
+    if (!currencyPair) missingFields.push("currencyPair");
+    if (entryPrice === undefined) missingFields.push("entryPrice");
+    if (quantity === undefined) missingFields.push("quantity");
+    if (!status) missingFields.push("status");
+    if (!entryDate) missingFields.push("entryDate");
+    if (!tradeType) missingFields.push("tradeType");
+
+    if (missingFields.length > 0) {
+      return res
+        .status(400)
+        .json({ msg: "Please enter all required fields", missingFields });
     }
 
     const trade = new Trade({
-      tradingAccounts,
-      currency,
+      tradingAccount,
+      currencyPair,
       entryPrice,
       exitPrice,
       takeProfit,
+      stopLoss,
       quantity,
       status,
       entryDate,
       exitDate,
+      tradeType,
     });
     await trade.save();
     res.json(trade);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).send("Server error");
   }
 };
 
 exports.getTrades = async (req, res) => {
   try {
-    const trades = await Trade.find({ tradingAccounts: { $in: req.user.tradingAccounts } });
+    const trades = await Trade.find({
+      tradingAccount: req.user.tradingAccount,
+    });
     res.json(trades);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).send("Server error");
   }
 };
