@@ -11,12 +11,17 @@ const messageRoutes = require("./routes/messageRoutes");
 const dotenv = require("dotenv");
 const initDB = require("./initDB");
 const initPropFirms = require("./initPropFirms");
+const bodyParser = require("body-parser");
 
 dotenv.config();
 
 const app = express();
 
 connectDB();
+
+// Configure body-parser
+app.use(bodyParser.json({ limit: "2mb" }));
+app.use(bodyParser.urlencoded({ limit: "2mb", extended: true }));
 
 app.use(express.json({ extended: false }));
 
