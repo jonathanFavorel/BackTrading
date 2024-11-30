@@ -1,7 +1,11 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const TradingAccountStatsSchema = new mongoose.Schema({
-  tradingAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'TradingAccount', required: true },
+  tradingAccount: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "TradingAccount",
+    required: true,
+  },
   totalTrades: { type: Number, default: 0 },
   winningTrades: { type: Number, default: 0 },
   losingTrades: { type: Number, default: 0 },
@@ -20,4 +24,7 @@ const TradingAccountStatsSchema = new mongoose.Schema({
   leastProfitablePairs: [{ symbol: String, loss: Number }],
 });
 
-module.exports = mongoose.model('TradingAccountStats', TradingAccountStatsSchema);
+module.exports = mongoose.model(
+  "TradingAccountStats",
+  TradingAccountStatsSchema
+);
