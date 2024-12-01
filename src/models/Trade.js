@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const TradeStats = require("./TradeStats");
 const TradingAccountStats = require("./TradingAccountStats");
 const Currency = require("./Currency");
 
@@ -8,7 +9,7 @@ const TradeSchema = new mongoose.Schema({
     ref: "TradingAccount",
     required: true,
   },
-  currencyPair: {
+  currency: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Currency",
     required: true,
@@ -18,187 +19,187 @@ const TradeSchema = new mongoose.Schema({
   takeProfit: { type: Number },
   stopLoss: { type: Number },
   quantity: { type: Number, required: true },
-  status: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ["en cours", "StopLoss", "BreakEven", "TakeProfit"],
+    required: true,
+  },
   entryDate: { type: Date, required: true },
   tradeType: { type: String, required: true, enum: ["short", "long", "hold"] },
   exitDate: { type: Date },
+  tradeType: { type: String, required: true },
 });
 
-// Middleware post-save pour mettre à jour les statistiques
+// Hook pour mettre à jour les statistiques après la création d'un trade
 TradeSchema.post("save", async function (doc, next) {
+  await updateTradeStats(doc);
+  next();
+});
+
+// Hook pour mettre à jour les statistiques après la mise à jour d'un trade
+TradeSchema.post("findOneAndUpdate", async function (doc, next) {
+  await updateTradeStats(doc);
+  next();
+});
+
+// Hook pour mettre à jour les statistiques après la suppression d'un trade
+TradeSchema.post("findOneAndRemove", async function (doc, next) {
+  await updateTradeStats(doc);
+  next();
+});
+
+// Fonction pour mettre à jour les statistiques des trades et du compte de trading
+const updateTradeStats = async (trade) => {
   try {
-    const stats = await TradingAccountStats.findOne({
-      tradingAccount: doc.tradingAccount,
-    });
-    const currencyPair = await Currency.findById(doc.currencyPair);
+    const currency = await Currency.findById(trade.currency);
+    const symbol = currency ? currency.symbol : "Unknown";
 
-    if (!currencyPair) {
-      const error = new Error("Currency pair not found");
-      error.status = 404;
-      return next(error);
-    }
+    const stats = await TradeStats.findOne({ trade: trade._id });
 
-    let profitOrLoss;
-    if (doc.tradeType === "short") {
-      profitOrLoss = (doc.entryPrice - doc.exitPrice) * doc.quantity;
-    } else {
-      profitOrLoss = (doc.exitPrice - doc.entryPrice) * doc.quantity;
-    }
-
-    const isWinningTrade = profitOrLoss > 0;
-    const isLosingTrade = profitOrLoss < 0;
-    const isBreakEvenTrade = profitOrLoss === 0;
+    const profit = trade.exitPrice
+      ? (trade.exitPrice - trade.entryPrice) * trade.quantity
+      : 0;
+    const loss = trade.exitPrice
+      ? (trade.entryPrice - trade.exitPrice) * trade.quantity
+      : 0;
 
     if (!stats) {
-      // Créer un nouveau document de statistiques si inexistant
-      const newStats = new TradingAccountStats({
-        tradingAccount: doc.tradingAccount,
+      const newStats = new TradeStats({
+        trade: trade._id,
+        symbol: symbol,
         totalTrades: 1,
-        winningTrades: isWinningTrade ? 1 : 0,
-        losingTrades: isLosingTrade ? 1 : 0,
-        breakEvenTrades: isBreakEvenTrade ? 1 : 0,
-        totalProfit: isWinningTrade ? profitOrLoss : 0,
-        totalLoss: isLosingTrade ? -profitOrLoss : 0,
-        netProfit: profitOrLoss,
-        winRate: isWinningTrade ? 100 : 0,
-        averageWin: isWinningTrade ? profitOrLoss : 0,
-        averageLoss: isLosingTrade ? -profitOrLoss : 0,
-        profitFactor: isWinningTrade ? profitOrLoss : 0,
-        averageTrade: profitOrLoss,
-        mostTradedPairs: [
-          {
-            symbol: currencyPair.symbol,
-            name: currencyPair.name,
-            id: currencyPair._id,
-            type: currencyPair.type,
-            count: 1,
-          },
-        ],
-        mostProfitablePairs: isWinningTrade
-          ? [
-              {
-                symbol: currencyPair.symbol,
-                name: currencyPair.name,
-                id: currencyPair._id,
-                type: currencyPair.type,
-                profit: profitOrLoss,
-              },
-            ]
-          : [],
-        leastProfitablePairs: isLosingTrade
-          ? [
-              {
-                symbol: currencyPair.symbol,
-                name: currencyPair.name,
-                id: currencyPair._id,
-                type: currencyPair.type,
-                loss: -profitOrLoss,
-              },
-            ]
-          : [],
-        winningShortTrades: doc.tradeType === "short" && isWinningTrade ? 1 : 0,
-        losingShortTrades: doc.tradeType === "short" && isLosingTrade ? 1 : 0,
-        winningLongTrades: doc.tradeType === "long" && isWinningTrade ? 1 : 0,
-        losingLongTrades: doc.tradeType === "long" && isLosingTrade ? 1 : 0,
+        totalVolume: trade.quantity,
+        totalProfit: profit > 0 ? profit : 0,
+        totalLoss: loss > 0 ? loss : 0,
+        winRate: trade.status === "TakeProfit" ? 100 : 0,
       });
       await newStats.save();
     } else {
-      // Mettre à jour les statistiques existantes
       stats.totalTrades += 1;
-      if (isWinningTrade) {
-        stats.winningTrades += 1;
-        stats.totalProfit += profitOrLoss;
-        if (doc.tradeType === "short") {
-          stats.winningShortTrades += 1;
-        } else if (doc.tradeType === "long") {
-          stats.winningLongTrades += 1;
-        }
-        const profitablePair = stats.mostProfitablePairs.find(
-          (pair) => pair.symbol === currencyPair.symbol
-        );
-        if (profitablePair) {
-          profitablePair.profit += profitOrLoss;
-        } else {
-          stats.mostProfitablePairs.push({
-            symbol: currencyPair.symbol,
-            name: currencyPair.name,
-            id: currencyPair._id,
-            type: currencyPair.type,
-            profit: profitOrLoss,
-          });
-        }
-      } else if (isLosingTrade) {
-        stats.losingTrades += 1;
-        stats.totalLoss += -profitOrLoss;
-        if (doc.tradeType === "short") {
-          stats.losingShortTrades += 1;
-        } else if (doc.tradeType === "long") {
-          stats.losingLongTrades += 1;
-        }
-        const profitablePair = stats.mostProfitablePairs.find(
-          (pair) => pair.symbol === currencyPair.symbol
-        );
-        if (profitablePair) {
-          profitablePair.profit += profitOrLoss;
-        } else {
-          stats.mostProfitablePairs.push({
-            symbol: currencyPair.symbol,
-            name: currencyPair.name,
-            id: currencyPair._id,
-            type: currencyPair.type,
-            profit: profitOrLoss,
-          });
-        }
-      } else {
-        stats.breakEvenTrades += 1;
-      }
-      stats.netProfit = stats.totalProfit - stats.totalLoss;
-      stats.winRate = (stats.winningTrades / stats.totalTrades) * 100;
-      stats.averageWin =
-        stats.winningTrades > 0 ? stats.totalProfit / stats.winningTrades : 0;
-      stats.averageLoss =
-        stats.losingTrades > 0 ? stats.totalLoss / stats.losingTrades : 0;
-      stats.profitFactor =
-        stats.totalLoss > 0
-          ? stats.totalProfit / stats.totalLoss
-          : stats.totalProfit;
-      stats.averageTrade =
-        stats.totalTrades > 0 ? stats.netProfit / stats.totalTrades : 0;
-
-      const tradedPair = stats.mostTradedPairs.find(
-        (pair) => pair.symbol === currencyPair.symbol
-      );
-      if (tradedPair) {
-        tradedPair.count += 1;
-      } else {
-        stats.mostTradedPairs.push({
-          symbol: currencyPair.symbol,
-          name: currencyPair.name,
-          id: currencyPair._id,
-          type: currencyPair.type,
-          count: 1,
-        });
-      }
-
-      // Limiter les paires les plus tradées à 5
-      stats.mostTradedPairs = stats.mostTradedPairs
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-
-      // Limiter les paires les plus profitables à 3
-      stats.mostProfitablePairs = stats.mostProfitablePairs
-        .sort((a, b) => b.profit - a.profit)
-        .slice(0, 3);
-
+      stats.totalVolume += trade.quantity;
+      stats.totalProfit += profit > 0 ? profit : 0;
+      stats.totalLoss += loss > 0 ? loss : 0;
+      const winningTrades = await mongoose.model("Trade").countDocuments({
+        tradingAccount: trade.tradingAccount,
+        status: "TakeProfit",
+      });
+      stats.winRate = (winningTrades / stats.totalTrades) * 100;
       await stats.save();
     }
-    next();
+
+    // Mettre à jour les statistiques du compte de trading
+    await updateTradingAccountStats(trade.tradingAccount);
   } catch (err) {
-    console.error("Error updating trading account stats:", err);
-    const error = new Error("Server error");
-    error.status = 500;
-    next(error);
+    console.error(err.message);
   }
-});
+};
+
+// Fonction pour mettre à jour les statistiques du compte de trading
+const updateTradingAccountStats = async (tradingAccountId) => {
+  try {
+    const trades = await mongoose
+      .model("Trade")
+      .find({ tradingAccount: tradingAccountId })
+      .populate("currency");
+
+    const stats = {
+      totalTrades: trades.length,
+      winningTrades: 0,
+      losingTrades: 0,
+      breakEvenTrades: 0,
+      totalVolume: 0,
+      totalProfit: 0,
+      totalLoss: 0,
+      netProfit: 0,
+      winRate: 0,
+      averageWin: 0,
+      averageLoss: 0,
+      profitFactor: 0,
+      averageTrade: 0,
+      rank: 0,
+      mostTradedPairs: {},
+      mostProfitablePairs: {},
+      leastProfitablePairs: {},
+    };
+
+    trades.forEach((trade) => {
+      const profit = trade.exitPrice
+        ? (trade.exitPrice - trade.entryPrice) * trade.quantity
+        : 0;
+      const loss = trade.exitPrice
+        ? (trade.entryPrice - trade.exitPrice) * trade.quantity
+        : 0;
+
+      stats.totalVolume += trade.quantity;
+      stats.totalProfit += profit > 0 ? profit : 0;
+      stats.totalLoss += loss > 0 ? loss : 0;
+
+      if (profit > 0) {
+        stats.winningTrades += 1;
+      } else if (loss > 0) {
+        stats.losingTrades += 1;
+      } else if (trade.status === "BreakEven") {
+        stats.breakEvenTrades += 1;
+      }
+
+      const pair = trade.currency.symbol;
+      if (!stats.mostTradedPairs[pair]) {
+        stats.mostTradedPairs[pair] = { count: 0, profit: 0, loss: 0 };
+      }
+      stats.mostTradedPairs[pair].count += 1;
+      stats.mostTradedPairs[pair].profit += profit;
+      stats.mostTradedPairs[pair].loss += loss;
+    });
+
+    stats.netProfit = stats.totalProfit - stats.totalLoss;
+    stats.winRate = (stats.winningTrades / stats.totalTrades) * 100;
+    stats.averageWin =
+      stats.winningTrades > 0 ? stats.totalProfit / stats.winningTrades : 0;
+    stats.averageLoss =
+      stats.losingTrades > 0 ? stats.totalLoss / stats.losingTrades : 0;
+    stats.profitFactor =
+      stats.totalLoss > 0 ? stats.totalProfit / stats.totalLoss : 0;
+    stats.averageTrade =
+      stats.totalTrades > 0 ? stats.netProfit / stats.totalTrades : 0;
+
+    // Trier et sélectionner les paires les plus échangées, les plus profitables et les moins profitables
+    const mostTradedPairs = Object.entries(stats.mostTradedPairs)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 3)
+      .map(([symbol, data]) => ({ symbol, count: data.count }));
+
+    const mostProfitablePairs = Object.entries(stats.mostTradedPairs)
+      .map(([symbol, data]) => ({
+        symbol,
+        profit: data.profit,
+        count: data.count,
+      }))
+      .filter((pair) => pair.profit > 0)
+      .sort((a, b) => b.profit - a.profit)
+      .slice(0, 3);
+
+    const leastProfitablePairs = Object.entries(stats.mostTradedPairs)
+      .map(([symbol, data]) => ({
+        symbol,
+        loss: data.loss,
+        count: data.count,
+      }))
+      .filter((pair) => pair.loss > 0)
+      .sort((a, b) => a.loss - b.loss)
+      .slice(0, 3);
+
+    stats.mostTradedPairs = mostTradedPairs;
+    stats.mostProfitablePairs = mostProfitablePairs;
+    stats.leastProfitablePairs = leastProfitablePairs;
+
+    await TradingAccountStats.findOneAndUpdate(
+      { tradingAccount: tradingAccountId },
+      stats,
+      { upsert: true }
+    );
+  } catch (err) {
+    console.error(err.message);
+  }
+};
 
 module.exports = mongoose.model("Trade", TradeSchema);

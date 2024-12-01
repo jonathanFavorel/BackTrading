@@ -1,9 +1,10 @@
 const Trade = require("../models/Trade");
+const { updateTradingAccountStats } = require("../utils/statsUtils");
 
 exports.createTrade = async (req, res) => {
   const {
     tradingAccount,
-    currencyPair,
+    currency,
     entryPrice,
     exitPrice,
     takeProfit,
@@ -19,7 +20,7 @@ exports.createTrade = async (req, res) => {
     // Vérification des champs requis
     const missingFields = [];
     if (!tradingAccount) missingFields.push("tradingAccount");
-    if (!currencyPair) missingFields.push("currencyPair");
+    if (!currency) missingFields.push("currency");
     if (entryPrice === undefined) missingFields.push("entryPrice");
     if (quantity === undefined) missingFields.push("quantity");
     if (!status) missingFields.push("status");
@@ -34,7 +35,7 @@ exports.createTrade = async (req, res) => {
 
     const trade = new Trade({
       tradingAccount,
-      currencyPair,
+      currency,
       entryPrice,
       exitPrice,
       takeProfit,
@@ -46,6 +47,10 @@ exports.createTrade = async (req, res) => {
       tradeType,
     });
     await trade.save();
+
+    // Mettre à jour les statistiques du compte de trading
+    await updateTradingAccountStats(tradingAccount);
+
     res.json(trade);
   } catch (err) {
     console.error(err.message);
@@ -55,10 +60,95 @@ exports.createTrade = async (req, res) => {
 
 exports.getTrades = async (req, res) => {
   try {
-    const trades = await Trade.find({
-      tradingAccount: req.user.tradingAccount,
-    });
+    const trades = await Trade.find({ user: req.user.id }).populate("currency");
     res.json(trades);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.getTradeById = async (req, res) => {
+  try {
+    const trade = await Trade.findById(req.params.id).populate("currency");
+
+    if (!trade) {
+      return res.status(404).json({ msg: "Trade not found" });
+    }
+
+    res.json(trade);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.updateTrade = async (req, res) => {
+  const {
+    tradingAccount,
+    currency,
+    entryPrice,
+    exitPrice,
+    takeProfit,
+    stopLoss,
+    quantity,
+    status,
+    entryDate,
+    exitDate,
+    tradeType,
+  } = req.body;
+
+  const updatedFields = {
+    tradingAccount,
+    currency,
+    entryPrice,
+    exitPrice,
+    takeProfit,
+    stopLoss,
+    quantity,
+    status,
+    entryDate,
+    exitDate,
+    tradeType,
+  };
+
+  try {
+    let trade = await Trade.findById(req.params.id);
+
+    if (!trade) {
+      return res.status(404).json({ msg: "Trade not found" });
+    }
+
+    trade = await Trade.findByIdAndUpdate(
+      req.params.id,
+      { $set: updatedFields },
+      { new: true }
+    );
+
+    // Mettre à jour les statistiques du compte de trading
+    await updateTradingAccountStats(tradingAccount);
+
+    res.json(trade);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.deleteTrade = async (req, res) => {
+  try {
+    const trade = await Trade.findById(req.params.id);
+
+    if (!trade) {
+      return res.status(404).json({ msg: "Trade not found" });
+    }
+
+    await trade.remove();
+
+    // Mettre à jour les statistiques du compte de trading
+    await updateTradingAccountStats(trade.tradingAccount);
+
+    res.json({ msg: "Trade removed" });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server error");
