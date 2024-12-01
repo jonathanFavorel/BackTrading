@@ -9,6 +9,7 @@ const friendRoutes = require("./routes/friendRoutes");
 const enemyRoutes = require("./routes/enemyRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const dotenv = require("dotenv");
+const bodyParser = require("body-parser"); // Ajoutez cette ligne
 
 dotenv.config();
 
