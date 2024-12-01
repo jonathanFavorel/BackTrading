@@ -143,7 +143,7 @@ exports.deleteTrade = async (req, res) => {
       return res.status(404).json({ msg: "Trade not found" });
     }
 
-    await trade.remove();
+    await Trade.findByIdAndDelete(req.params.id);
 
     // Mettre à jour les statistiques du compte de trading
     await updateTradingAccountStats(trade.tradingAccount);
