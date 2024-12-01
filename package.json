@@ -15,7 +15,7 @@
     "mongoose": "^5.12.3"
   },
   "devDependencies": {
-    "nodemon": "^2.0.7"
+    "nodemon": "^2.0.22"
   },
   "author": "",
   "license": "ISC"
