@@ -9,9 +9,6 @@ const friendRoutes = require("./routes/friendRoutes");
 const enemyRoutes = require("./routes/enemyRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const dotenv = require("dotenv");
-const initDB = require("./initDB");
-const initPropFirms = require("./initPropFirms");
-const bodyParser = require("body-parser");
 
 dotenv.config();
 
@@ -36,8 +33,4 @@ app.use("/api/messages", messageRoutes);
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, async () => {
-  console.log(`Server started on port ${PORT}`);
-  await initDB();
-  await initPropFirms();
-});
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
