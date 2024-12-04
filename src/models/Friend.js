@@ -11,7 +11,12 @@ const FriendSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  status: { type: String, enum: ["pending", "accepted"], required: true },
+  status: {
+    type: String,
+    enum: ["pending", "accepted", "declined"],
+    default: "pending",
+    required: true,
+  },
   createdAt: { type: Date, default: Date.now },
   acceptedAt: { type: Date },
 });

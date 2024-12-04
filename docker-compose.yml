@@ -1,10 +1,10 @@
 version: "3.8"
 
 services:
-  app:
+  api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.api
     container_name: trading-journal-api
     ports:
       - "3000:3000"
@@ -13,6 +13,21 @@ services:
       - JWT_SECRET=your_jwt_secret
     depends_on:
       - mongo
+      - websocket
+
+  websocket:
+    build:
+      context: .
+      dockerfile: Dockerfile.websocket
+    container_name: websocket-server
+    ports:
+      - "4000:4000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/trading-journal
+      - JWT_SECRET=your_jwt_secret
+    depends_on:
+      - mongo
+
   mongo:
     image: mongo:latest
     container_name: mongo

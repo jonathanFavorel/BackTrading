@@ -12,7 +12,7 @@ const UserSchema = new mongoose.Schema({
   bio: { type: String },
   createdAt: { type: Date, default: Date.now },
   lastLogin: { type: Date },
-  onlineStatus: { type: Boolean, default: false },
+  isOnline: { type: Boolean, default: false },
   isAdmin: { type: Boolean, default: false },
   privacySettings: {
     showEmail: { type: Boolean, default: true },

@@ -139,22 +139,50 @@ exports.updateUserProfile = async (req, res) => {
     lastName,
     phoneNumber,
     bio,
+    profilePicture,
   };
 
-  if (profilePicture) {
-    const buffer = Buffer.from(profilePicture, "base64");
-    if (buffer.length > MAX_IMAGE_SIZE) {
-      return res.status(400).json({ msg: "Image size exceeds 1MB" });
-    }
-    updatedFields.profilePicture = profilePicture;
-  }
-
   try {
-    const user = await User.findByIdAndUpdate(
+    let user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    user = await User.findByIdAndUpdate(
       req.user.id,
       { $set: updatedFields },
       { new: true }
     ).select("-password");
+
+    res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
+
+exports.getUserByCriteria = async (req, res) => {
+  const { id, email, surname, name } = req.query;
+
+  // Vérification des critères de recherche
+  if (!id && !email && !surname && !name) {
+    return res
+      .status(400)
+      .json({ msg: "Please provide at least one search criteria" });
+  }
+
+  try {
+    let query = {};
+    if (id) query._id = id;
+    if (email) query.email = email;
+    if (surname) query.lastName = surname;
+    if (name) query.firstName = name;
+
+    const user = await User.findOne(query).select("-password");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
     res.json(user);
   } catch (err) {
     console.error(err.message);
