@@ -1,4 +1,5 @@
 const express = require("express");
+const http = require("http");
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const tradingAccountRoutes = require("./routes/tradingAccountRoutes");
@@ -9,13 +10,20 @@ const friendRoutes = require("./routes/friendRoutes");
 const enemyRoutes = require("./routes/enemyRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const dotenv = require("dotenv");
-const bodyParser = require("body-parser"); // Ajoutez cette ligne
+const bodyParser = require("body-parser");
+const initDB = require("./initDB");
+const initPropFirms = require("./initPropFirms");
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 
-connectDB();
+connectDB().then(async () => {
+  // Initialiser les données après la connexion à la base de données
+  await initDB();
+  await initPropFirms();
+});
 
 // Configure body-parser
 app.use(bodyParser.json({ limit: "2mb" }));
@@ -34,4 +42,4 @@ app.use("/api/messages", messageRoutes);
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server started on port ${PORT}`));

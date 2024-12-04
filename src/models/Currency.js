@@ -4,6 +4,7 @@ const CurrencySchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
   symbol: { type: String, required: true, unique: true },
   contractSize: { type: Number, required: true },
+  tickSize: { type: Number, required: true },
   type: {
     type: String,
     required: true,

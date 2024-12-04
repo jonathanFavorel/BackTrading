@@ -78,7 +78,7 @@ exports.deletePropFirm = async (req, res) => {
       return res.status(404).json({ msg: "Prop firm not found" });
     }
 
-    await propFirm.remove();
+    await propFirm.deleteOne();
 
     res.json({ msg: "Prop firm removed" });
   } catch (err) {

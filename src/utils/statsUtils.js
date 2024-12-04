@@ -1,4 +1,3 @@
-const mongoose = require("mongoose");
 const TradingAccountStats = require("../models/TradingAccountStats");
 const Trade = require("../models/Trade");
 
@@ -29,12 +28,8 @@ const updateTradingAccountStats = async (tradingAccountId) => {
     };
 
     trades.forEach((trade) => {
-      const profit = trade.exitPrice
-        ? (trade.exitPrice - trade.entryPrice) * trade.quantity
-        : 0;
-      const loss = trade.exitPrice
-        ? (trade.entryPrice - trade.exitPrice) * trade.quantity
-        : 0;
+      const profit = trade.profit;
+      const loss = profit < 0 ? -profit : 0;
 
       stats.totalVolume += trade.quantity;
       stats.totalProfit += profit > 0 ? profit : 0;
@@ -48,13 +43,15 @@ const updateTradingAccountStats = async (tradingAccountId) => {
         stats.breakEvenTrades += 1;
       }
 
-      const pair = trade.currency.symbol;
-      if (!stats.mostTradedPairs[pair]) {
-        stats.mostTradedPairs[pair] = { count: 0, profit: 0, loss: 0 };
+      if (trade.currency) {
+        const pair = trade.currency.symbol;
+        if (!stats.mostTradedPairs[pair]) {
+          stats.mostTradedPairs[pair] = { count: 0, profit: 0, loss: 0 };
+        }
+        stats.mostTradedPairs[pair].count += 1;
+        stats.mostTradedPairs[pair].profit += profit;
+        stats.mostTradedPairs[pair].loss += loss;
       }
-      stats.mostTradedPairs[pair].count += 1;
-      stats.mostTradedPairs[pair].profit += profit;
-      stats.mostTradedPairs[pair].loss += loss;
     });
 
     stats.netProfit = stats.totalProfit - stats.totalLoss;
@@ -68,7 +65,6 @@ const updateTradingAccountStats = async (tradingAccountId) => {
     stats.averageTrade =
       stats.totalTrades > 0 ? stats.netProfit / stats.totalTrades : 0;
 
-    // Trier et sélectionner les paires les plus échangées, les plus profitables et les moins profitables
     const mostTradedPairs = Object.entries(stats.mostTradedPairs)
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 3)
